@@ -6,9 +6,10 @@
   "clips_per_episode": 6,
   "generate_times": [
     "09:00",
-    "15:00"
+    "15:00",
+    "21:00"
   ],
-  "daily_upload_cap": 2,
+  "daily_upload_cap": 3,
   "upload_privacy": "private",
   "auto_approve": true,
   "auto_clips": true,
