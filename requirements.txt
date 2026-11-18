@@ -1,0 +1,8 @@
+google-genai
+python-dotenv
+requests
+flask
+edge-tts
+google-api-python-client
+google-auth-oauthlib
+google-auth-httplib2

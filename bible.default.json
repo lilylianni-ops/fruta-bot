@@ -1,0 +1,13 @@
+{
+  "style": "animación 3D estilo cartoon, colores vivos, iluminación cálida de colmado dominicano",
+  "setting": "un colmado dominicano en un barrio con mucho chisme",
+  "characters": [
+    {"name": "Mango", "trait": "chismoso y coqueto", "visual": "mango antropomorfo amarillo-naranja con bigote fino y camisa abierta"},
+    {"name": "Piña", "trait": "dramática y celosa", "visual": "piña antropomorfa con corona verde grande y tacones rojos"},
+    {"name": "Fresa", "trait": "inocente y enamorada", "visual": "fresa antropomorfa pequeña con ojos grandes y lazo rosado"},
+    {"name": "Doña Sandía", "trait": "dueña del colmado, la que manda", "visual": "sandía antropomorfa grande, delantal y rolos en el pelo"}
+  ],
+  "episodes": [],
+  "used_titles": [],
+  "used_hooks": []
+}

@@ -1,0 +1,17 @@
+{
+  "model": "gemini-3.1-flash-lite",
+  "channel_name": "Frutas Novelas",
+  "niche": "novela de frutas con personajes de IA, ambiente dominicano, humor y chisme de colmado",
+  "language": "español dominicano, informal y gracioso",
+  "clips_per_episode": 6,
+  "generate_times": [
+    "09:00",
+    "15:00"
+  ],
+  "daily_upload_cap": 2,
+  "upload_privacy": "private",
+  "auto_approve": true,
+  "auto_clips": true,
+  "voice": "es-DO-RamonaNeural",
+  "voice_rate": "+5%"
+}

@@ -1,0 +1,55 @@
+name: fruta-bot
+
+on:
+  schedule:
+    - cron: "*/20 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: fruta-bot
+  cancel-in-progress: false
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Configurar secretos
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          PANEL_PASSWORD: ${{ secrets.PANEL_PASSWORD }}
+          CLIENT_SECRET_JSON: ${{ secrets.CLIENT_SECRET_JSON }}
+          TOKEN_JSON: ${{ secrets.TOKEN_JSON }}
+        run: |
+          printf 'GEMINI_API_KEY=%s\nTELEGRAM_TOKEN=%s\nTELEGRAM_CHAT_ID=%s\nPANEL_PASSWORD=%s\n' \
+            "$GEMINI_API_KEY" "$TELEGRAM_TOKEN" "$TELEGRAM_CHAT_ID" "$PANEL_PASSWORD" > .env
+          printf '%s' "$CLIENT_SECRET_JSON" > client_secret.json
+          printf '%s' "$TOKEN_JSON" > token.json
+
+      - name: Correr el bot (7 minutos)
+        run: timeout 420 python3 bot.py || true
+
+      - name: Guardar estado en el repo
+        if: always()
+        run: |
+          git config user.name "fruta-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add -f data/bible.json data/state.json data/trends.json data/episodes/*/episode.json 2>/dev/null || true
+          if ! git diff --cached --quiet; then
+            git commit -m "estado $(date -u +%FT%TZ)"
+            git push
+          fi
