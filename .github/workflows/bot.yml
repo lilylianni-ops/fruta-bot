@@ -9,6 +9,9 @@ concurrency:
   group: fruta-bot
   cancel-in-progress: false
 
+permissions:
+  contents: write
+
 jobs:
   tick:
     runs-on: ubuntu-latest
