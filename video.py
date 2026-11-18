@@ -46,8 +46,12 @@ def assemble(n):
     _run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", "list.txt", "-c", "copy", "joined.mp4"], d)
     style = "FontSize=16,Alignment=2,MarginV=220,Outline=3,Bold=1"
     name = "".join(ch for ch in c.get("channel_name", "") if ch not in ":,'\\%")
-    wm = (f",drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:"
-          f"text='{name}':fontsize=15:fontcolor=white@0.55:x=12:y=12:box=1:boxcolor=black@0.25:boxborderw=8")
+    font = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+    wm = (f",drawtext=fontfile={font}:text='{name}':fontsize=15:fontcolor=white@0.55:x=12:y=12"
+          f":box=1:boxcolor=black@0.25:boxborderw=8,"
+          f"drawtext=fontfile={font}:text='Suscríbete':fontsize=34:fontcolor=white:"
+          f"x=(w-text_w)/2:y=h-text_h-160:box=1:boxcolor=black@0.45:boxborderw=12"
+          f":enable='gte(t,{max(t - 3.0, 0):.2f})'")
     _run(["ffmpeg", "-y", "-i", "joined.mp4", "-vf", f"subtitles=subs.srt:force_style='{style}'{wm}",
           "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "copy", "final.mp4"], d)
     return d / "final.mp4", t

@@ -10,7 +10,7 @@
     "01:00"
   ],
   "daily_upload_cap": 3,
-  "upload_privacy": "private",
+  "upload_privacy": "public",
   "auto_approve": true,
   "auto_clips": true,
   "voice": "es-DO-RamonaNeural",
