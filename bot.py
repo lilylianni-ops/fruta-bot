@@ -6,20 +6,28 @@ import core, notify, story
 def slots_tick():
     s, c = state(), cfg()
     if s["paused"]:
+        print("[slots_tick] Bot en pausa.", flush=True)
         return
     now = dt.datetime.now()
     done = s["slots"].setdefault(today(), [])
+    print(f"[slots_tick] hora={now.strftime('%H:%M')} slots_hoy={done} generate_times={c['generate_times']}", flush=True)
     for slot in c["generate_times"]:
         h, m = map(int, slot.split(":"))
         diff = (now - now.replace(hour=h, minute=m, second=0, microsecond=0)).total_seconds() / 60
         if diff >= 0 and slot not in done:
+            print(f"[slots_tick] Activando slot={slot} diff={diff:.1f}m", flush=True)
             done.append(slot)
             if s.get("trends_day") != today():
                 s["trends_day"] = today()
             save_state(s)
             if diff <= 120:
+                print("[slots_tick] Refrescando tendencias...", flush=True)
                 story.refresh_trends()
+                print("[slots_tick] Llamando a core.generate()...", flush=True)
                 core.generate()
+                print("[slots_tick] core.generate() terminado.", flush=True)
+            else:
+                print(f"[slots_tick] Slot {slot} fuera de ventana (diff={diff:.1f}m > 120m).", flush=True)
             return
 
 
@@ -36,6 +44,7 @@ def handle_commands():
         if not parts:
             continue
         cmd, arg = parts[0].lower(), (int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else None)
+        print(f"[cmd] Recibido comando: {cmd} arg={arg}", flush=True)
         if cmd == "/ok" and arg:
             core.approve(arg)
         elif cmd == "/no" and arg:
@@ -56,13 +65,18 @@ def handle_commands():
 def main():
     if not os.getenv("GH_ACTIONS"):
         notify.send("Bot de Frutas Novelas encendido.")
+    print("[main] Bot de Frutas Novelas iniciado.", flush=True)
     while True:
+        print(f"[loop] hora={dt.datetime.now().strftime('%H:%M:%S')} hoy={today()}", flush=True)
         for step in (slots_tick, core.check_clips, core.check_uploads, handle_commands):
+            print(f"[paso] Iniciando {step.__name__}", flush=True)
             try:
                 step()
+                print(f"[paso] Finalizado {step.__name__}", flush=True)
             except Exception as ex:
                 traceback.print_exc()
                 notify.send(f"Error en {step.__name__}: {str(ex)[:300]}")
+        print("[loop] Durmiendo 20s...", flush=True)
         time.sleep(20)
 
 
