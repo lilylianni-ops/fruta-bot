@@ -44,7 +44,7 @@ jobs:
           printf '%s' "$TOKEN_JSON" > token.json
 
       - name: Correr el bot (7 minutos)
-        run: timeout 420 python3 bot.py || true
+        run: timeout 420 python3 -u bot.py || true
 
       - name: Guardar estado en el repo
         if: always()
