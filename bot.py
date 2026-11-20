@@ -3,6 +3,8 @@ from pathlib import Path
 from store import *
 import core, notify, story, autoviral
 
+os.environ.setdefault("GH_ACTIONS", os.environ.get("GITHUB_ACTIONS", ""))
+
 _YT_RE = re.compile(r"(?:https?://)?(?:www\.)?(?:youtube\.com|youtu\.be)/\S+")
 
 
