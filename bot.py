@@ -123,6 +123,12 @@ def _remix_url(text):
         d.mkdir(parents=True, exist_ok=True)
         base = d / f"yt_{int(time.time())}"
         is_yt = bool(_YT_RE.search(url))
+        # Normalizar links de Google Drive a formato de descarga directa
+        dm = re.search(r"drive\.google\.com/file/d/([\w-]+)", url) or \
+             re.search(r"drive\.google\.com/open\?id=([\w-]+)", url)
+        if dm:
+            url = f"https://drive.google.com/uc?export=download&id={dm.group(1)}"
+            is_yt = False
         where = "YouTube" if is_yt else "enlace"
         _card("DESCARGANDO VIDEO", f"desde {where}", 1)
         opts = {
@@ -184,6 +190,8 @@ def _remix_url(text):
         msg = str(ex)[:300]
         if "not a bot" in msg.lower():
             msg += " — YouTube está bloqueando la sesión; hay que re-exportar cookies.txt y actualizar el secret YT_COOKIES."
+        if "401" in msg or "403" in msg or "Unauthorized" in msg or "Forbidden" in msg:
+            msg += " — Si es Google Drive, activa 'Cualquier persona con el enlace' en Compartir."
         notify.send(f"Error con el video del enlace: {msg}")
 
 
