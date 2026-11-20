@@ -95,8 +95,20 @@ def _remix_url(text):
         if Path(ck).exists():
             opts["cookiefile"] = ck
             notify.send("Usando sesion de YouTube para descargar...")
-        with yt_dlp.YoutubeDL(opts) as ydl:
-            info = ydl.extract_info(url, download=True)
+        last_err = None
+        for attempt in range(2):
+            try:
+                with yt_dlp.YoutubeDL(opts) as ydl:
+                    info = ydl.extract_info(url, download=True)
+                last_err = None
+                break
+            except Exception as ex:
+                last_err = ex
+                if attempt == 0:
+                    notify.send("Reintentando descarga (YouTube desafió el bot-check)...")
+                    time.sleep(15)
+        if last_err:
+            raise last_err
         src = None
         for f in sorted(d.glob(f"{base.name}.*")):
             if f.suffix.lower() in (".mp4", ".mkv", ".webm", ".mov"):
@@ -111,7 +123,10 @@ def _remix_url(text):
         _process_src(src, topic)
     except Exception as ex:
         traceback.print_exc()
-        notify.send(f"Error con el video de YouTube: {str(ex)[:300]}")
+        msg = str(ex)[:300]
+        if "not a bot" in msg.lower():
+            msg += " — YouTube está bloqueando la sesión; hay que re-exportar cookies.txt y actualizar el secret YT_COOKIES."
+        notify.send(f"Error con el video de YouTube: {msg}")
 
 
 def msg_caption(text):
