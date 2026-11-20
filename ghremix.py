@@ -45,6 +45,48 @@ def _jitter():
     }
 
 
+def _probe_wh(path):
+    out = subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "v:0",
+         "-show_entries", "stream=width,height", "-of", "csv=p=0", str(path)],
+        capture_output=True, text=True).stdout.strip()
+    w, h = out.split(",")[:2]
+    return int(w), int(h)
+
+
+def _grade_video(src, dst):
+    """Pase final anti-huella: fps=30, micro-jitter de pixels, color grade.
+    Sobre-escala ~3% para tener margen al jitter y recorta de vuelta."""
+    try:
+        w, h = _probe_wh(src)
+    except Exception:
+        w, h = 0, 0
+    if w < 100 or h < 100:
+        return src
+    sw, sh = int(w * 1.04) // 2 * 2, int(h * 1.04) // 2 * 2
+    cw, ch = w // 2 * 2, h // 2 * 2
+    x_slack = (sw - cw) // 2
+    y_slack = (sh - ch) // 2
+    vf = (
+        f"scale={sw}:{sh},fps=30,"
+        f"crop={cw}:{ch}:"
+        f"x='{x_slack // 2}+random(1)*{max(x_slack - 4, 4)}-{max(x_slack - 4, 4)//2}':"
+        f"y='{y_slack // 2}+random(1)*{max(y_slack - 4, 4)}-{max(y_slack - 4, 4)//2}',"
+        "eq=contrast=1.06:brightness=0.01:saturation=1.12:gamma=1.02,"
+        "colorbalance=rs=0.04:gs=0.01:bs=-0.05,"
+        "hue=h=2:s=1.05"
+    )
+    r = subprocess.run(
+        ["ffmpeg", "-y", "-i", str(src), "-vf", vf,
+         "-c:v", "libx264", "-preset", "fast", "-pix_fmt", "yuv420p",
+         "-c:a", "copy", str(dst)],
+        capture_output=True)
+    if r.returncode != 0:
+        print("[grade] ffmpeg fallo, usando video sin grade:", r.stderr[-200:])
+        return src
+    return dst
+
+
 def edit_video(src, topic="", work=None):
     """Edita un video: guion 'Sabías que...', voz nueva, música transformada,
     subtítulos, anti-copyright, 9:16. Devuelve Path del mp4 final."""
@@ -113,6 +155,10 @@ def edit_video(src, topic="", work=None):
     video_no_subs.mkdir(exist_ok=True)
     process_video_pipeline(src, video_no_subs, video_config)
     base_video = video_no_subs / f"final_{src.stem}.mp4"
+
+    # 4b. Grade final: fps, micro-jitter, color (rompe la huella visual)
+    graded = work / "graded.mp4"
+    base_video = _grade_video(base_video, graded)
 
     # 5. Subtítulos
     final_out = work / "final.mp4"
