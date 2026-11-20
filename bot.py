@@ -6,13 +6,23 @@ import core, notify, story, autoviral
 _YT_RE = re.compile(r"(?:https?://)?(?:www\.)?(?:youtube\.com|youtu\.be)/\S+")
 
 
+def _card(title, sub="", pct=0):
+    notify.card(title, sub, pct)
+
+
 def _process_src(src, topic):
     try:
         if os.getenv("GH_ACTIONS"):
             import ghremix, yt
-            notify.send("Editando en la nube (unos minutos)...")
-            out = ghremix.edit_video(src, topic=topic)
+            _card("EDITANDO VIDEO", topic or "en la nube", 2)
+
+            def _prog(msg, pct):
+                _card(msg.upper()[:38], topic or "", pct)
+
+            out = ghremix.edit_video(src, topic=topic, progress=_prog)
+            _card("VIDEO LISTO", "enviando resultado", 97)
             notify.send_video(out, "Video editado: voz nueva, subtítulos, música y anti-copyright.")
+            _card("SUBIENDO A YOUTUBE", "", 98)
             try:
                 vid = yt.upload(out, {
                     "title": (topic or "Short editado")[:90],
@@ -20,14 +30,19 @@ def _process_src(src, topic):
                     "tags": [],
                 }, cfg().get("upload_privacy", "private"))
                 notify.send(f"Subido a YouTube: https://youtu.be/{vid}")
+                _card("COMPLETADO", f"youtu.be/{vid}", 100)
             except Exception as e2:
                 notify.send(f"Editado, pero falló la subida a YouTube: {str(e2)[:200]}")
+                _card("EDICION LISTA", "fallo la subida a YouTube", 100)
         else:
+            _card("EDITANDO VIDEO", "servidor local", 2)
             out = autoviral.remix_video(src, topic=topic)
             notify.send_video(out, "Listo: marca de agua eliminada, voz nueva, subtítulos y música.")
+            _card("COMPLETADO", "video entregado", 100)
     except Exception as ex:
         traceback.print_exc()
         notify.send(f"Error editando el video: {str(ex)[:300]}")
+        _card("ERROR", str(ex)[:50], 0)
 
 
 def _remix_file(msg):
@@ -65,7 +80,7 @@ def _remix_url(text):
         d = Path("data/remix")
         d.mkdir(parents=True, exist_ok=True)
         base = d / f"yt_{int(time.time())}"
-        notify.send("Descargando tu video de YouTube en máxima calidad...")
+        _card("DESCARGANDO VIDEO", "desde YouTube", 1)
         opts = {
             "format": "bv*+ba/b",
             "merge_output_format": "mp4",
@@ -84,7 +99,7 @@ def _remix_url(text):
             src = cands[-1] if cands else None
         if not src:
             raise RuntimeError("yt-dlp no produjo archivo")
-        topic = ((info or {}).get("title") or "").strip() or (msg_caption(text) or "")
+        topic = ((info or {}).get("title") or "").strip() or msg_caption(text)
         notify.send(f"Descargado: {src.name} — editando...")
         _process_src(src, topic)
     except Exception as ex:

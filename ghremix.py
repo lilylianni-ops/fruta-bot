@@ -87,15 +87,24 @@ def _grade_video(src, dst):
     return dst
 
 
-def edit_video(src, topic="", work=None):
+def edit_video(src, topic="", work=None, progress=None):
     """Edita un video: guion 'Sabías que...', voz nueva, música transformada,
-    subtítulos, anti-copyright, 9:16. Devuelve Path del mp4 final."""
+    subtítulos, anti-copyright, 9:16. Devuelve Path del mp4 final.
+    progress: callable(mensaje, porcentaje) opcional."""
+    def _p(msg, pct):
+        if progress:
+            try:
+                progress(msg, pct)
+            except Exception:
+                pass
+
     c = cfg()
     src = Path(src)
     work = Path(work) if work else WORK_ROOT / f"remix_{int(time.time())}"
     work.mkdir(parents=True, exist_ok=True)
 
     # 1. Guion
+    _p("Generando guion 'Sabías que...?'", 8)
     writer = ScriptWriter({
         "llm_provider": c.get("remix_llm", "offline"),
         "llm": {"model": "llama3.2:1b"},
@@ -119,6 +128,7 @@ def edit_video(src, topic="", work=None):
         orig_audio = str(orig_wav)
 
     # 3. Audio completo (voz + música + original)
+    _p("Generando voz y música", 25)
     j = _jitter()
     audio_cfg = {
         "language": "es",
@@ -137,6 +147,7 @@ def edit_video(src, topic="", work=None):
     final_audio = generate_complete_audio(script_text, audio_cfg, work)
 
     # 4. Video
+    _p("Editando video (cortes, zoom, anti-copyright)", 50)
     z = j["zoom_range"]
     video_config = {
         "target_duration": target,
@@ -157,10 +168,12 @@ def edit_video(src, topic="", work=None):
     base_video = video_no_subs / f"final_{src.stem}.mp4"
 
     # 4b. Grade final: fps, micro-jitter, color (rompe la huella visual)
+    _p("Aplicando grade y micro-jitter", 75)
     graded = work / "graded.mp4"
     base_video = _grade_video(base_video, graded)
 
     # 5. Subtítulos
+    _p("Quemando subtítulos", 88)
     final_out = work / "final.mp4"
     subs_cfg = {
         "model_size": c.get("autoviral_whisper", "base"),
