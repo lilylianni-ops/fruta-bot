@@ -9,3 +9,4 @@ google-auth-httplib2
 scenedetect
 opencv-python-headless
 faster-whisper
+yt-dlp

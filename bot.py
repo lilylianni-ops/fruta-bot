@@ -1,7 +1,33 @@
-import os, time, threading, datetime as dt, traceback
+import os, re, time, threading, datetime as dt, traceback
 from pathlib import Path
 from store import *
 import core, notify, story, autoviral
+
+_YT_RE = re.compile(r"(?:https?://)?(?:www\.)?(?:youtube\.com|youtu\.be)/\S+")
+
+
+def _process_src(src, topic):
+    try:
+        if os.getenv("GH_ACTIONS"):
+            import ghremix, yt
+            notify.send("Editando en la nube (unos minutos)...")
+            out = ghremix.edit_video(src, topic=topic)
+            notify.send_video(out, "Video editado: voz nueva, subtítulos, música y anti-copyright.")
+            try:
+                vid = yt.upload(out, {
+                    "title": (topic or "Short editado")[:90],
+                    "description": "Video editado con ayuda de IA.\n#Shorts",
+                    "tags": [],
+                }, cfg().get("upload_privacy", "private"))
+                notify.send(f"Subido a YouTube: https://youtu.be/{vid}")
+            except Exception as e2:
+                notify.send(f"Editado, pero falló la subida a YouTube: {str(e2)[:200]}")
+        else:
+            out = autoviral.remix_video(src, topic=topic)
+            notify.send_video(out, "Listo: marca de agua eliminada, voz nueva, subtítulos y música.")
+    except Exception as ex:
+        traceback.print_exc()
+        notify.send(f"Error editando el video: {str(ex)[:300]}")
 
 
 def _remix_file(msg):
@@ -23,26 +49,52 @@ def _remix_file(msg):
             except Exception as ex:
                 notify.send(f"No pude analizar el video ({str(ex)[:120]}), uso tema genérico.")
                 topic = ""
-        if os.getenv("GH_ACTIONS"):
-            import ghremix, yt
-            notify.send("Editando en la nube (unos minutos)...")
-            out = ghremix.edit_video(src, topic=topic)
-            notify.send_video(out, "Video editado: voz nueva, subtítulos, música y anti-copyright.")
-            try:
-                vid = yt.upload(out, {
-                    "title": (topic or "Short editado")[:90],
-                    "description": "Video editado con ayuda de IA.\n#Shorts",
-                    "tags": [],
-                }, cfg().get("upload_privacy", "private"))
-                notify.send(f"Subido a YouTube: https://youtu.be/{vid}")
-            except Exception as e2:
-                notify.send(f"Editado, pero falló la subida a YouTube: {str(e2)[:200]}")
-        else:
-            out = autoviral.remix_video(src, topic=topic)
-            notify.send_video(out, "Listo: marca de agua eliminada, voz nueva, subtítulos y música.")
+        _process_src(src, topic)
     except Exception as ex:
         traceback.print_exc()
         notify.send(f"Error editando el video: {str(ex)[:300]}")
+
+
+def _remix_url(text):
+    m = _YT_RE.search(text)
+    if not m:
+        return
+    url = m.group(0)
+    try:
+        import yt_dlp
+        d = Path("data/remix")
+        d.mkdir(parents=True, exist_ok=True)
+        base = d / f"yt_{int(time.time())}"
+        notify.send("Descargando tu video de YouTube en máxima calidad...")
+        opts = {
+            "format": "bv*+ba/b",
+            "merge_output_format": "mp4",
+            "outtmpl": str(base) + ".%(ext)s",
+            "quiet": True,
+            "no_warnings": True,
+        }
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+        src = None
+        for f in sorted(d.glob(f"{base.name}.*")):
+            if f.suffix.lower() in (".mp4", ".mkv", ".webm", ".mov"):
+                src = f
+        if not src or not src.exists():
+            cands = sorted(d.glob("yt_*.mp4"), key=lambda p: p.stat().st_mtime)
+            src = cands[-1] if cands else None
+        if not src:
+            raise RuntimeError("yt-dlp no produjo archivo")
+        topic = ((info or {}).get("title") or "").strip() or (msg_caption(text) or "")
+        notify.send(f"Descargado: {src.name} — editando...")
+        _process_src(src, topic)
+    except Exception as ex:
+        traceback.print_exc()
+        notify.send(f"Error con el video de YouTube: {str(ex)[:300]}")
+
+
+def msg_caption(text):
+    """Texto que no es la URL se usa como tema/caption opcional."""
+    return _YT_RE.sub("", text).strip()
 
 
 def slots_tick():
@@ -87,6 +139,9 @@ def handle_commands():
             continue
         parts = (msg.get("text") or "").split()
         if not parts:
+            continue
+        if _YT_RE.search(msg["text"]):
+            threading.Thread(target=_remix_url, args=(msg["text"],), daemon=True).start()
             continue
         cmd, arg = parts[0].lower(), (int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else None)
         print(f"[cmd] Recibido comando: {cmd} arg={arg}", flush=True)
