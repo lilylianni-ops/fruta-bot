@@ -394,9 +394,10 @@ class SubtitleGenerator:
             "ffmpeg", "-y",
             "-i", str(video_path),
             "-vf", f"ass='{ass_escaped}'",
-            "-c:v", "libx264", "-preset", "fast", "-crf", "20",
+            "-c:v", "libx264", "-preset", "medium", "-crf", "16",
             "-pix_fmt", "yuv420p",
             "-c:a", "copy",
+            "-movflags", "+faststart",
             str(output_path)
         ]
         

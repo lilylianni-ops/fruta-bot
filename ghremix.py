@@ -111,7 +111,8 @@ def _grade_video(src, dst):
     )
     r = subprocess.run(
         ["ffmpeg", "-y", "-i", str(src), "-vf", vf,
-         "-c:v", "libx264", "-preset", "fast", "-pix_fmt", "yuv420p",
+         "-c:v", "libx264", "-preset", "medium", "-crf", "18",
+         "-pix_fmt", "yuv420p",
          "-c:a", "copy", str(dst)],
         capture_output=True)
     if r.returncode != 0:
