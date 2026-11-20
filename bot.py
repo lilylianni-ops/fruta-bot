@@ -88,6 +88,10 @@ def _remix_url(text):
             "quiet": True,
             "no_warnings": True,
         }
+        ck = os.environ.get("YT_COOKIES", "cookies.txt")
+        if Path(ck).exists():
+            opts["cookiefile"] = ck
+            notify.send("Usando sesion de YouTube para descargar...")
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=True)
         src = None

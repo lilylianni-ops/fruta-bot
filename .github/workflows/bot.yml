@@ -39,11 +39,13 @@ jobs:
           PANEL_PASSWORD: ${{ secrets.PANEL_PASSWORD }}
           CLIENT_SECRET_JSON: ${{ secrets.CLIENT_SECRET_JSON }}
           TOKEN_JSON: ${{ secrets.TOKEN_JSON }}
+          YT_COOKIES: ${{ secrets.YT_COOKIES }}
         run: |
           printf 'GEMINI_API_KEY=%s\nTELEGRAM_TOKEN=%s\nTELEGRAM_CHAT_ID=%s\nPANEL_PASSWORD=%s\n' \
             "$GEMINI_API_KEY" "$TELEGRAM_TOKEN" "$TELEGRAM_CHAT_ID" "$PANEL_PASSWORD" > .env
           printf '%s' "$CLIENT_SECRET_JSON" > client_secret.json
           printf '%s' "$TOKEN_JSON" > token.json
+          if [ -n "$YT_COOKIES" ]; then printf '%s' "$YT_COOKIES" > cookies.txt; fi
 
       - name: Correr el bot (35 minutos)
         run: timeout 2100 python3 -u bot.py || true
