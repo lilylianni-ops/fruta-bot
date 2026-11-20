@@ -47,6 +47,12 @@ jobs:
           printf '%s' "$TOKEN_JSON" > token.json
           if [ -n "$YT_COOKIES" ]; then printf '%s' "$YT_COOKIES" > cookies.txt; fi
 
+      - name: Iniciar PO Token Provider (anti bot-check YouTube)
+        run: |
+          docker run --name bgutil-provider -d --init \
+            -p 127.0.0.1:4416:4416 brainicism/bgutil-ytdlp-pot-provider || true
+          sleep 8
+
       - name: Correr el bot (35 minutos)
         run: timeout 2100 python3 -u bot.py || true
 

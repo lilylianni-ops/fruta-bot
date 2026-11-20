@@ -13,3 +13,4 @@ yt-dlp
 pillow
 edge-tts>=7.0
 yt-dlp-ejs
+bgutil-ytdlp-pot-provider
