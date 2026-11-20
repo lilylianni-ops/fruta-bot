@@ -90,6 +90,11 @@ def _remix_url(text):
             "quiet": True,
             "no_warnings": True,
             "js_runtimes": {"node": {}},
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["tv", "android_vr", "ios", "mweb", "web_safari"],
+                }
+            },
         }
         ck = os.environ.get("YT_COOKIES", "cookies.txt")
         if Path(ck).exists():
