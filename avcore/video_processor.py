@@ -33,7 +33,10 @@ class VideoProcessor:
                 "progress": progress or (phase / total * 100)
             }
             self.socketio.emit("progress", data, room=self.task_id)
-        print(f"[{phase}/{total}] {message}")
+        try:
+            print(f"[{phase}/{total}] {message}")
+        except UnicodeEncodeError:
+            print(f"[{phase}/{total}] {message.encode('ascii', 'replace').decode()}")
 
     def _run_ffmpeg(self, cmd: List[str], desc: str = "FFmpeg") -> subprocess.CompletedProcess:
         """Ejecuta FFmpeg con manejo de errores y rutas escapadas para Windows."""
@@ -109,17 +112,18 @@ class VideoProcessor:
         # Construir filter_complex
         vf_parts = []
         
-        # 1. Escala base a 1080x1920 manteniendo aspecto, luego crop central
+        # 1. Escala base a 2160x3840 manteniendo aspecto
         vf_parts.append(
-            "scale=2160:3840:force_original_aspect_ratio=increase,"
-            "crop=1080:1920"
+            "scale=2160:3840:force_original_aspect_ratio=increase"
         )
-        
-        # 2. Zoom progresivo (Ken Burns) - zoompan
-        zoom_start, zoom_end = zoom_range
+
+        # 2. Recorte 9:16 con zoom permanente (~8%) y paneo suave por frame.
+        #    (zoompan era insoportablemente lento a 1080x1920)
         vf_parts.append(
-            f"zoompan=z='min({zoom_start}+({zoom_end}-{zoom_start})*on/180,{zoom_end})':"
-            f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=180:s=1080x1920:fps=30"
+            "crop=1000:1778:"
+            "x='(in_w-1000)/2+120*sin(n/90)':"
+            "y='(in_h-1778)/2+120*cos(n/110)',"
+            "scale=1080:1920"
         )
         
         # 3. Blur de zonas específicas para marcas de agua
@@ -185,11 +189,14 @@ class VideoProcessor:
         self._emit(2, 5, "Aplicando dinamismo visual anti-copyright...")
         
         vf_parts = []
-        
-        # Ken Burns suave
+
+        # Micro-zoom/paneo barato via crop con expresiones por frame
+        # (zoompan eliminado: demasiado lento a esta resolucion)
         vf_parts.append(
-            "zoompan=z='min(1.02+0.03*on/180,1.05)':"
-            "x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=180:s=1080x1920:fps=30"
+            "crop=1040:1849:"
+            "x='(in_w-1040)/2+15*sin(n/120)':"
+            "y='(in_h-1849)/2+15*cos(n/140)',"
+            "scale=1080:1920"
         )
         
         # Espejo horizontal si se pide
@@ -272,12 +279,22 @@ class VideoProcessor:
         }
         
         pos = pos_map.get(position, pos_map["bottom-right"])
-        font = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-        if not Path(font).exists():
-            font = "C:/Windows/Fonts/arialbd.ttf"
-        
+        candidates = [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            "C:/Windows/Fonts/arialbd.ttf",
+            "C:/Windows/Fonts/arial.ttf",
+        ]
+        font = next((f for f in candidates if Path(f).exists()), None)
+        if font:
+            font_opt = "fontfile='" + font.replace(":", "\\:") + "'"
+        else:
+            font_opt = "font='Arial'"
+        safe = (text.replace("\\", "\\\\").replace(":", "\\:")
+                    .replace("'", "\\'").replace('"', ""))
+
         vf = (
-            f"drawtext=fontfile={font}:text='{text}':fontsize=28:"
+            f"drawtext={font_opt}:text='{safe}':fontsize=28:"
             f"fontcolor=white@0.7:{pos}:box=1:boxcolor=black@0.3:boxborderw=8"
         )
         
