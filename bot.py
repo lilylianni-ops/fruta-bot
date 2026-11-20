@@ -57,6 +57,15 @@ def _remix_file(msg):
         d.mkdir(parents=True, exist_ok=True)
         src = d / f"src_{int(time.time())}.mp4"
         notify.download_file(file_id, src)
+    except Exception as ex:
+        if "too big" in str(ex).lower() or "file is too" in str(ex).lower():
+            notify.send("Ese video pesa más de 20MB (límite de Telegram). "
+                        "Comprímelo primero o usa un Short más corto.")
+        else:
+            traceback.print_exc()
+            notify.send(f"Error editando el video: {str(ex)[:300]}")
+        return
+    try:
         topic = (msg.get("caption") or "").strip()
         if not topic:
             notify.send("Detectando el tema del video...")

@@ -113,8 +113,10 @@ def download_file(file_id, dest):
     if not enabled():
         raise RuntimeError("telegram no configurado")
     r = requests.get(_api("getFile"), params={"file_id": file_id}, timeout=30)
-    r.raise_for_status()
-    fpath = r.json()["result"]["file_path"]
+    j = r.json()
+    if not j.get("ok"):
+        raise RuntimeError(j.get("description", "getFile fallo"))
+    fpath = j["result"]["file_path"]
     url = f"https://api.telegram.org/file/bot{os.getenv('TELEGRAM_TOKEN')}/{fpath}"
     with requests.get(url, stream=True, timeout=300) as resp:
         resp.raise_for_status()
