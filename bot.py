@@ -6,6 +6,7 @@ import core, notify, story, autoviral
 os.environ.setdefault("GH_ACTIONS", os.environ.get("GITHUB_ACTIONS", ""))
 
 _YT_RE = re.compile(r"(?:https?://)?(?:www\.)?(?:youtube\.com|youtu\.be)/\S+")
+_URL_RE = re.compile(r"https?://[^\s]+")
 
 
 def _card(title, sub="", pct=0):
@@ -81,35 +82,69 @@ def _remix_file(msg):
         notify.send(f"Error editando el video: {str(ex)[:300]}")
 
 
+def _direct_download(url, base):
+    """Descarga directa para URLs que yt-dlp no soporta (archivos .mp4, etc.)."""
+    import requests
+    r = requests.get(url, stream=True, timeout=60,
+                     headers={"User-Agent": "Mozilla/5.0"})
+    r.raise_for_status()
+    ctype = (r.headers.get("Content-Type") or "").lower()
+    path = url.split("?")[0]
+    ext = ".mp4"
+    low = path.lower()
+    for e in (".mp4", ".mkv", ".webm", ".mov", ".avi"):
+        if low.endswith(e):
+            ext = e
+            break
+    else:
+        if "webm" in ctype:
+            ext = ".webm"
+        elif "quicktime" in ctype or "mov" in ctype:
+            ext = ".mov"
+    out = base.with_suffix(ext)
+    with open(out, "wb") as f:
+        for chunk in r.iter_content(1 << 20):
+            f.write(chunk)
+    return out
+
+
 def _remix_url(text):
-    m = _YT_RE.search(text)
-    if not m:
-        return
-    url = m.group(0)
+    m = _URL_RE.search(text)
+    if m:
+        url = m.group(0).rstrip(".,;)")
+    else:
+        ym = _YT_RE.search(text)
+        if not ym:
+            return
+        url = "https://" + ym.group(0)
     try:
         import yt_dlp
         d = Path("data/remix")
         d.mkdir(parents=True, exist_ok=True)
         base = d / f"yt_{int(time.time())}"
-        _card("DESCARGANDO VIDEO", "desde YouTube", 1)
+        is_yt = bool(_YT_RE.search(url))
+        where = "YouTube" if is_yt else "enlace"
+        _card("DESCARGANDO VIDEO", f"desde {where}", 1)
         opts = {
-            "format": "bv*+ba/b",
+            "format": "bv*+ba/b" if is_yt else "best[ext=mp4]/best",
             "merge_output_format": "mp4",
             "outtmpl": str(base) + ".%(ext)s",
             "quiet": True,
             "no_warnings": True,
             "js_runtimes": {"node": {}},
-            "extractor_args": {
+        }
+        if is_yt:
+            opts["extractor_args"] = {
                 "youtube": {
                     "player_client": ["tv", "android_vr", "ios", "mweb", "web_safari"],
                 }
-            },
-        }
+            }
         ck = os.environ.get("YT_COOKIES", "cookies.txt")
-        if Path(ck).exists():
+        if is_yt and Path(ck).exists():
             opts["cookiefile"] = ck
             notify.send("Usando sesion de YouTube para descargar...")
         last_err = None
+        info = None
         for attempt in range(2):
             try:
                 with yt_dlp.YoutubeDL(opts) as ydl:
@@ -119,33 +154,42 @@ def _remix_url(text):
             except Exception as ex:
                 last_err = ex
                 if attempt == 0:
-                    notify.send("Reintentando descarga (YouTube desafió el bot-check)...")
+                    notify.send("Reintentando descarga...")
                     time.sleep(15)
-        if last_err:
-            raise last_err
         src = None
-        for f in sorted(d.glob(f"{base.name}.*")):
-            if f.suffix.lower() in (".mp4", ".mkv", ".webm", ".mov"):
-                src = f
+        if last_err is None:
+            for f in sorted(d.glob(f"{base.name}.*")):
+                if f.suffix.lower() in (".mp4", ".mkv", ".webm", ".mov"):
+                    src = f
+        if (not src or not src.exists()) and last_err is not None and not is_yt:
+            # yt-dlp no pudo: intentar descarga HTTP directa del archivo
+            try:
+                notify.send("yt-dlp fallo, intento descarga directa...")
+                src = _direct_download(url, base)
+                last_err = None
+            except Exception as ex2:
+                last_err = ex2
         if not src or not src.exists():
+            if last_err:
+                raise last_err
             cands = sorted(d.glob("yt_*.mp4"), key=lambda p: p.stat().st_mtime)
             src = cands[-1] if cands else None
         if not src:
-            raise RuntimeError("yt-dlp no produjo archivo")
+            raise RuntimeError("la descarga no produjo archivo")
         topic = ((info or {}).get("title") or "").strip() or msg_caption(text)
-        notify.send(f"Descargado: {src.name} — editando...")
+        notify.send(f"Descargado: {src.name} — analizando y editando...")
         _process_src(src, topic)
     except Exception as ex:
         traceback.print_exc()
         msg = str(ex)[:300]
         if "not a bot" in msg.lower():
             msg += " — YouTube está bloqueando la sesión; hay que re-exportar cookies.txt y actualizar el secret YT_COOKIES."
-        notify.send(f"Error con el video de YouTube: {msg}")
+        notify.send(f"Error con el video del enlace: {msg}")
 
 
 def msg_caption(text):
     """Texto que no es la URL se usa como tema/caption opcional."""
-    return _YT_RE.sub("", text).strip()
+    return _URL_RE.sub("", text).strip()
 
 
 def slots_tick():
@@ -195,7 +239,7 @@ def handle_commands():
         parts = (msg.get("text") or "").split()
         if not parts:
             continue
-        if _YT_RE.search(msg["text"]):
+        if _URL_RE.search(msg["text"]) or _YT_RE.search(msg["text"]):
             if gh:
                 _remix_url(msg["text"])
             else:

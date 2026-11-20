@@ -25,6 +25,39 @@ def _dur(p):
     return float(out.strip())
 
 
+def _scene_cuts(src):
+    """Timestamps de cambios de escena via ffmpeg (contenido dinamico)."""
+    r = subprocess.run(
+        ["ffmpeg", "-i", str(src), "-an",
+         "-vf", "select='gt(scene,0.3)',showinfo", "-f", "null", "-"],
+        capture_output=True, text=True)
+    times = []
+    for line in r.stderr.splitlines():
+        if "pts_time:" in line:
+            try:
+                times.append(float(line.split("pts_time:")[1].split()[0]))
+            except Exception:
+                pass
+    return times
+
+
+def _best_window(src, target):
+    """Elige el segmento de `target` segundos con mas cambios de escena
+    (lo mas dinamico/accion del video). 0.0 si no hay suficientes cortes."""
+    try:
+        cuts = _scene_cuts(src)
+    except Exception:
+        cuts = []
+    if len(cuts) < 3:
+        return 0.0
+    best_start, best_count = 0.0, -1
+    for c in cuts:
+        cnt = sum(1 for t in cuts if c <= t <= c + target)
+        if cnt > best_count:
+            best_count, best_start = cnt, c
+    return max(0.0, best_start - 0.5)
+
+
 def _jitter():
     fx = {
         "tempo": round(random.uniform(1.05, 1.15), 3),
@@ -112,11 +145,23 @@ def edit_video(src, topic="", work=None, progress=None):
     })
     target = int(min(_dur(src), c.get("remix_duration", 60)))
 
+    # Elegir el mejor segmento del video (mas dinamico), no solo el inicio
+    start = 0.0
+    if _dur(src) > target + 5:
+        _p("Buscando el mejor segmento del video...", 4)
+        try:
+            start = _best_window(src, target)
+        except Exception as ex:
+            print("[best_window] fallo, uso inicio:", ex)
+            start = 0.0
+        mm, ss = int(start // 60), int(start % 60)
+        _p(f"Mejor segmento: {mm}:{ss:02d}", 5)
+
     # Pre-trim + downscale: solo procesamos `target` segundos en max 1080p
     # (evita que un video 4K de 10 min mate el runner por timeout)
     pre = work / "pre.mp4"
     r = subprocess.run(
-        ["ffmpeg", "-y", "-i", str(src), "-t", str(target),
+        ["ffmpeg", "-y", "-ss", str(start), "-i", str(src), "-t", str(target),
          "-vf", "scale='min(1920,iw)':-2",
          "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p",
          "-c:a", "aac", "-b:a", "128k", str(pre)],
