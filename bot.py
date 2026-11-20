@@ -1,6 +1,48 @@
-import os, time, datetime as dt, traceback
+import os, time, threading, datetime as dt, traceback
+from pathlib import Path
 from store import *
-import core, notify, story
+import core, notify, story, autoviral
+
+
+def _remix_file(msg):
+    media = msg.get("video") or msg.get("document") or {}
+    file_id = media.get("file_id")
+    if not file_id:
+        return
+    try:
+        d = Path("data/remix")
+        d.mkdir(parents=True, exist_ok=True)
+        src = d / f"src_{int(time.time())}.mp4"
+        notify.download_file(file_id, src)
+        topic = (msg.get("caption") or "").strip()
+        if not topic:
+            notify.send("Detectando el tema del video...")
+            try:
+                topic = autoviral.describe_video(src)
+                notify.send(f"Tema detectado: {topic}")
+            except Exception as ex:
+                notify.send(f"No pude analizar el video ({str(ex)[:120]}), uso tema genérico.")
+                topic = ""
+        if os.getenv("GH_ACTIONS"):
+            import ghremix, yt
+            notify.send("Editando en la nube (unos minutos)...")
+            out = ghremix.edit_video(src, topic=topic)
+            notify.send_video(out, "Video editado: voz nueva, subtítulos, música y anti-copyright.")
+            try:
+                vid = yt.upload(out, {
+                    "title": (topic or "Short editado")[:90],
+                    "description": "Video editado con ayuda de IA.\n#Shorts",
+                    "tags": [],
+                }, cfg().get("upload_privacy", "private"))
+                notify.send(f"Subido a YouTube: https://youtu.be/{vid}")
+            except Exception as e2:
+                notify.send(f"Editado, pero falló la subida a YouTube: {str(e2)[:200]}")
+        else:
+            out = autoviral.remix_video(src, topic=topic)
+            notify.send_video(out, "Listo: marca de agua eliminada, voz nueva, subtítulos y música.")
+    except Exception as ex:
+        traceback.print_exc()
+        notify.send(f"Error editando el video: {str(ex)[:300]}")
 
 
 def slots_tick():
@@ -39,6 +81,9 @@ def handle_commands():
         save_state(s)
         msg = u.get("message") or {}
         if str(msg.get("chat", {}).get("id")) != os.getenv("TELEGRAM_CHAT_ID"):
+            continue
+        if msg.get("video") or msg.get("document"):
+            threading.Thread(target=_remix_file, args=(msg,), daemon=True).start()
             continue
         parts = (msg.get("text") or "").split()
         if not parts:

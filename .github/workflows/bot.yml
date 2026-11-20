@@ -15,7 +15,7 @@ permissions:
 jobs:
   tick:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
 
@@ -43,8 +43,8 @@ jobs:
           printf '%s' "$CLIENT_SECRET_JSON" > client_secret.json
           printf '%s' "$TOKEN_JSON" > token.json
 
-      - name: Correr el bot (7 minutos)
-        run: timeout 420 python3 -u bot.py || true
+      - name: Correr el bot (35 minutos)
+        run: timeout 2100 python3 -u bot.py || true
 
       - name: Guardar estado en el repo
         if: always()

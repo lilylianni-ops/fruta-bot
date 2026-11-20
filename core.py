@@ -1,6 +1,6 @@
 import traceback
 from store import *
-import story, video, yt, notify, aiclips
+import story, video, yt, notify, aiclips, autoviral
 
 
 def generate():
@@ -19,7 +19,10 @@ def build(n):
     e["status"] = "assembling"
     ep_save(e)
     try:
-        path, secs = video.assemble(n)
+        if cfg().get("use_autoviral") and autoviral.available():
+            path, secs = autoviral.produce(n)
+        else:
+            path, secs = video.assemble(n)
     except Exception as ex:
         e["status"], e["error"] = "error", str(ex)[:400]
         ep_save(e)

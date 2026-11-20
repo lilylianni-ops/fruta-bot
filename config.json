@@ -14,5 +14,12 @@
   "auto_approve": true,
   "auto_clips": true,
   "voice": "es-DO-RamonaNeural",
-  "voice_rate": "+5%"
+  "voice_rate": "+5%",
+  "use_autoviral": true,
+  "autoviral_url": "http://localhost:5000",
+  "autoviral_subtitles": true,
+  "autoviral_whisper": "base",
+  "music_volume": 0.15,
+  "remix_duration": 60,
+  "remix_llm": "offline"
 }
