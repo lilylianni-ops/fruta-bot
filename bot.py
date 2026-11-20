@@ -211,8 +211,9 @@ def main():
         notify.send("Bot de Frutas Novelas encendido.")
     print("[main] Bot de Frutas Novelas iniciado.", flush=True)
     if os.getenv("GH_ACTIONS"):
-        # En GitHub: una pasada y salir (el cron externo nos despierta cada pocos min)
-        for step in (slots_tick, core.check_clips, core.check_uploads, handle_commands):
+        # En GitHub: una pasada y salir. Comandos de Telegram primero
+        # (el cron externo nos despierta cada pocos min).
+        for step in (handle_commands, core.check_uploads, slots_tick, core.check_clips):
             try:
                 step()
             except Exception as ex:
