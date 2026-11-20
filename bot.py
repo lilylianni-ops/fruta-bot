@@ -149,14 +149,21 @@ def handle_commands():
         msg = u.get("message") or {}
         if str(msg.get("chat", {}).get("id")) != os.getenv("TELEGRAM_CHAT_ID"):
             continue
+        gh = bool(os.getenv("GH_ACTIONS"))
         if msg.get("video") or msg.get("document"):
-            threading.Thread(target=_remix_file, args=(msg,), daemon=True).start()
+            if gh:
+                _remix_file(msg)
+            else:
+                threading.Thread(target=_remix_file, args=(msg,), daemon=True).start()
             continue
         parts = (msg.get("text") or "").split()
         if not parts:
             continue
         if _YT_RE.search(msg["text"]):
-            threading.Thread(target=_remix_url, args=(msg["text"],), daemon=True).start()
+            if gh:
+                _remix_url(msg["text"])
+            else:
+                threading.Thread(target=_remix_url, args=(msg["text"],), daemon=True).start()
             continue
         cmd, arg = parts[0].lower(), (int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else None)
         print(f"[cmd] Recibido comando: {cmd} arg={arg}", flush=True)
@@ -181,6 +188,15 @@ def main():
     if not os.getenv("GH_ACTIONS"):
         notify.send("Bot de Frutas Novelas encendido.")
     print("[main] Bot de Frutas Novelas iniciado.", flush=True)
+    if os.getenv("GH_ACTIONS"):
+        # En GitHub: una pasada y salir (el cron externo nos despierta cada pocos min)
+        for step in (slots_tick, core.check_clips, core.check_uploads, handle_commands):
+            try:
+                step()
+            except Exception as ex:
+                traceback.print_exc()
+                notify.send(f"Error en {step.__name__}: {str(ex)[:300]}")
+        return
     while True:
         print(f"[loop] hora={dt.datetime.now().strftime('%H:%M:%S')} hoy={today()}", flush=True)
         for step in (slots_tick, core.check_clips, core.check_uploads, handle_commands):
