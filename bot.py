@@ -87,6 +87,7 @@ def _remix_url(text):
             "outtmpl": str(base) + ".%(ext)s",
             "quiet": True,
             "no_warnings": True,
+            "js_runtimes": {"node": {}},
         }
         ck = os.environ.get("YT_COOKIES", "cookies.txt")
         if Path(ck).exists():

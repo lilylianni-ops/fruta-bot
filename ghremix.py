@@ -111,6 +111,19 @@ def edit_video(src, topic="", work=None, progress=None):
         "language": "es",
     })
     target = int(min(_dur(src), c.get("remix_duration", 60)))
+
+    # Pre-trim + downscale: solo procesamos `target` segundos en max 1080p
+    # (evita que un video 4K de 10 min mate el runner por timeout)
+    pre = work / "pre.mp4"
+    r = subprocess.run(
+        ["ffmpeg", "-y", "-i", str(src), "-t", str(target),
+         "-vf", "scale='min(1920,iw)':-2",
+         "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p",
+         "-c:a", "aac", "-b:a", "128k", str(pre)],
+        capture_output=True)
+    if r.returncode == 0 and pre.exists():
+        src = pre
+
     script = writer.generate(
         topic=topic or "video viral",
         mode=ScriptMode.STORY,
