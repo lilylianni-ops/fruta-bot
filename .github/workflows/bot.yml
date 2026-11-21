@@ -61,8 +61,11 @@ jobs:
         run: |
           git config user.name "fruta-bot"
           git config user.email "bot@users.noreply.github.com"
+          git checkout -B main 2>/dev/null || git checkout -b main
           git add -f data/bible.json data/state.json data/trends.json data/episodes/*/episode.json 2>/dev/null || true
           if ! git diff --cached --quiet; then
             git commit -m "estado $(date -u +%FT%TZ)"
-            git push
+            git fetch origin main
+            git rebase origin/main || git rebase --abort
+            git push origin HEAD:main || git push origin HEAD:main --force-with-lease || true
           fi

@@ -233,6 +233,12 @@ def handle_commands():
     for u in notify.updates(s["offset"]):
         s = state()
         s["offset"] = u["update_id"] + 1
+        proc = s.setdefault("processed", [])
+        if u["update_id"] in proc:
+            save_state(s)
+            continue
+        proc.append(u["update_id"])
+        s["processed"] = proc[-500:]
         save_state(s)
         msg = u.get("message") or {}
         if str(msg.get("chat", {}).get("id")) != os.getenv("TELEGRAM_CHAT_ID"):
